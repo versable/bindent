@@ -1,0 +1,131 @@
+#!/usr/bin/perl
+
+use warnings;
+use strict;
+
+use Getopt::Long;
+use Pod::Usage;
+use Text::Diff;
+
+my ($help, $inPlace, $showDiff) = (0, 0);
+GetOptions('help' => \$help, 'in-place' => \$inPlace, 'diff' => \$showDiff)
+    or pod2usage(2);
+pod2usage(-exitval => 0, -verbose => 1) if $help;
+pod2usage("$0: No files given.") if ((@ARGV == 0) && (-t STDIN));
+
+# Process piped input
+if (!(-t STDIN))
+{
+    my $values = {
+        content    => '',
+        diff       => '',
+        whitespace => '',
+        matched    => '',
+    };
+    while (<STDIN>)
+    {
+        processLine($_, $values);
+    }
+    print $values->{content} if !$showDiff;
+    printDiff('', $values->{diff}, $values->{content}) if $showDiff;
+    exit 0;
+}
+
+# Process file list
+foreach (@ARGV)
+{
+    my $path = $_;
+    if (!-f $path)
+    {
+        print "'$path' is not a file, skipping.\n";
+        next;
+    }
+    open my $file, '<', $path or die "Can't open '$_', skipping.\n";
+    my $values = {
+        content    => '',
+        diff       => '',
+        whitespace => '',
+        matched    => '',
+    };
+    while (<$file>)
+    {
+        processLine($_, $values);
+    }
+    close $file;
+    if (!$inPlace)
+    {
+        print $values->{content} if !$showDiff;
+        printDiff($path, $values->{diff}, $values->{content}) if $showDiff;
+        next;
+    }
+    if ($values->{diff} eq $values->{content})
+    {
+        print "No changes to '$path', skipping.\n";
+        next;
+    }
+    print "Writing changes to '$path'.\n";
+    open my $newFile, '>', $path or die "Can't open '$path', skipping.\n";
+    print $newFile $values->{content};
+    close $newFile;
+    printDiff($path, $values->{diff}, $values->{content}) if $showDiff;
+}
+
+sub processLine
+{
+    my $line   = shift;
+    my $values = shift;
+
+    $values->{diff} .= $line;
+    if ($line =~ m/^(\s*)\/\*/g)
+    {
+        $values->{whitespace} = $1 . ' ';
+        $values->{matched}    = 1;
+    }
+    elsif ($values->{matched} && $line =~ m/^\s*\*/g)
+    {
+        my $whitespace = $values->{whitespace};
+        $line =~ s/^\s*/$whitespace/g;
+    }
+    $values->{matched} = 0 if $values->{matched} && $line =~ m/\*\//g;
+    $values->{content} .= $line;
+}
+
+sub printDiff
+{
+    my $path  = shift;
+    my $diff1 = shift;
+    my $diff2 = shift;
+
+    print "$path\n";
+    print diff \$diff1, \$diff2;
+}
+__END__
+
+=head1 NAME
+
+bindent - Properly indent C-Style block comments, can be piped.
+
+=head1 SYNOPSIS
+
+bindent [options] [file ...]
+
+B<This program> will read the given input file(s) or piped standart input and
+properly indent C-Style block comments, either as standart output or in place
+(--in-place).
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--help>
+Print a brief help message and exits.
+
+=item B<--in-place>
+Modifies the specified files in place, will be ignored when piping.
+
+=item B<--diff>
+Outputs a diff instead of the standart output
+
+=back
+
+=cut
