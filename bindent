@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Text::Diff;
 
-my ($help, $inPlace, $showDiff) = (0, 0);
+my ($help, $inPlace, $showDiff) = (0, 0, 0);
 GetOptions('help' => \$help, 'in-place' => \$inPlace, 'diff' => \$showDiff)
     or pod2usage(2);
 pod2usage(-exitval => 0, -verbose => 1) if $help;
@@ -27,7 +27,7 @@ if (!(-t STDIN))
         processLine($_, $values);
     }
     print $values->{content} if !$showDiff;
-    printDiff('', $values->{diff}, $values->{content}) if $showDiff;
+    printDiff($values->{diff}, $values->{content}) if $showDiff;
     exit 0;
 }
 
@@ -37,7 +37,7 @@ foreach (@ARGV)
     my $path = $_;
     if (!-f $path)
     {
-        print "'$path' is not a file, skipping.\n";
+        warn "'$path' is not a file, skipping.\n";
         next;
     }
     open my $file, '<', $path or die "Can't open '$_', skipping.\n";
@@ -52,22 +52,16 @@ foreach (@ARGV)
         processLine($_, $values);
     }
     close $file;
+    printDiff($values->{diff}, $values->{content}) if $showDiff;
     if (!$inPlace)
     {
         print $values->{content} if !$showDiff;
-        printDiff($path, $values->{diff}, $values->{content}) if $showDiff;
         next;
     }
-    if ($values->{diff} eq $values->{content})
-    {
-        print "No changes to '$path', skipping.\n";
-        next;
-    }
-    print "Writing changes to '$path'.\n";
+    next if $values->{diff} eq $values->{content};
     open my $newFile, '>', $path or die "Can't open '$path', skipping.\n";
     print $newFile $values->{content};
     close $newFile;
-    printDiff($path, $values->{diff}, $values->{content}) if $showDiff;
 }
 
 sub processLine
@@ -92,11 +86,9 @@ sub processLine
 
 sub printDiff
 {
-    my $path  = shift;
     my $diff1 = shift;
     my $diff2 = shift;
 
-    print "$path\n";
     print diff \$diff1, \$diff2;
 }
 __END__
@@ -124,7 +116,7 @@ Print a brief help message and exits.
 Modifies the specified files in place, will be ignored when piping.
 
 =item B<--diff>
-Outputs a diff instead of the whole file
+Outputs a diff instead of the whole file.
 
 =back
 
