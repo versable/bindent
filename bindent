@@ -109,8 +109,8 @@ bindent - Properly indent C-Style block comments, can be piped.
 
 bindent [options] [file ...]
 
-B<This program> will read the given input file(s) or piped standart input and
-properly indent C-Style block comments, either as standart output or in place
+B<This program> will read the given input file(s) or piped standard input and
+properly indent C-Style block comments, either as standard output or in place
 (--in-place).
 
 =head1 OPTIONS
@@ -124,7 +124,7 @@ Print a brief help message and exits.
 Modifies the specified files in place, will be ignored when piping.
 
 =item B<--diff>
-Outputs a diff instead of the standart output
+Outputs a diff instead of the whole file
 
 =back
 
